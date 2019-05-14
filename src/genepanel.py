@@ -45,7 +45,7 @@ __version__ = 0.01
               Input string json with the following keys:
               genename, transcript, exon_number, coordinate.
               ''')
-@click.option('-o', '--output-bed', required=True, help='Output file name.')
+@click.option('-o', '--output-bed', help='Output file name. If nothing is specified, it will be genename.bed')
 @click.option(
     '--strand-match/--no-strand-match',
     default=False,
@@ -67,13 +67,18 @@ def genepanel(log_level, reference, input_json, output_bed, strand_match):
     LOG.debug("Input string %s", input_json)
     LOG.debug("Reference file is %s", reference)
     LOG.debug("Strandness search is set to %s", strand_match)
-    LOG.debug("Output file is %s", output_bed)
 
     try:
         input_json = read_json(input_json)
     except:
         LOG.error("Invalid input json string")
         raise click.Abort()
+
+    if not output_bed:
+        output_bed = input_json['genename']+".bed"
+        LOG.info("Setting output file name as %s",output_bed) 
+    else:
+        LOG.debug("Output file is %s", output_bed)
 
     try:
         LOG.debug("Loading reference file into a dataframe")
