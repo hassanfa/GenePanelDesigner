@@ -77,18 +77,40 @@ def genepanel(log_level, reference, input_json, output_bed, strand_match):
 
     try:
         LOG.debug("Loading reference file into a dataframe")
-        reference_df = pandas.read_csv(reference,delimiter='\t',encoding='utf-8')
+        reference_df = pandas.read_csv(
+            reference, delimiter='\t', encoding='utf-8')
     except:
         LOG.error("Couldn't load reference file into dataframe")
         raise click.Abort()
 
-    df = copy.deepcopy(reference_df.loc[reference_df['name2']==input_json['genename'],
-        ['chrom','exonStarts', 'exonEnds','strand', 'name2','name','exonCount']])
-    df['bed_4_name'] = df[['name2','name','exonCount']].apply(lambda x: '|'.join(x.values.astype(str)), axis=1)
-    df = df.drop(columns=['name2', 'name', 'exonCount'])
-    df_bed=pybedtools.BedTool.from_dataframe(df).sort()
-    df_bed.merge().saveas(output_bed)
+    try:
+        LOG.debug("Extracting regions based on genename")
+        df = copy.deepcopy(
+            reference_df.loc[reference_df['name2'] == input_json['genename'], [
+                'chrom', 'exonStarts', 'exonEnds', 'strand', 'name2', 'name',
+                'exonCount'
+            ]])
+    except:
+        LOG.error("Extracting genename from reference file failed")
+        raise click.Abort()
 
+    if df.shape[0] == 0:
+        LOG.warning(
+            "No enteries for input string was found in reference file.")
+
+    try:
+        LOG.debug("Converting dataframe to pybedtools object and expanding exonStarts and exonEnds")
+        df_bed = pybedtools.BedTool.from_dataframe(df).expand(c="2,3").sort()
+    except:
+        LOG.error("Bed objet creation failed")
+        raise click.Abort()
+
+    try:
+        LOG.debug("Merging bed regions and collapsing disctint strand, genename, transcript")
+        df_bed.merge(c='4,5,6', o="distinct").saveas(output_bed)
+    except:
+        LOG.error("Merge and collapse of BED object failed")
+        raise click.Abort()
 
 if __name__ == '__main__':
     genepanel()
