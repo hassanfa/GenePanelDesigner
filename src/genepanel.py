@@ -120,13 +120,15 @@ def genepanel(log_level, reference, input_json, output_bed, strand_match):
         raise click.Abort()
 
     # if there is exons entry, expand the range
-    if input_json['exons']:
-        exon_range = parseIntSet(input_json['exons'])
-        if exon_range is None:
-            LOG.error('Incorrect exon range. Example: <3,4-7,10-12,24')
-            raise click.Abort()
-        input_json['exons'] = ",".join(str(x) for x in exon_range)
-        LOG.info('Exon ranges converted to %s', exon_range)
+    exon_range = False
+    if 'exons' in input_json.keys():
+        if input_json['exons']:
+            exon_range = list(parseIntSet(input_json['exons']))
+            if exon_range is None:
+                LOG.error('Incorrect exon range. Example: <3,4-7,10-12,24')
+                raise click.Abort()
+            input_json['exons'] = ",".join(str(x) for x in exon_range)
+            LOG.info('Exon ranges converted to %s', exon_range)
 
     # if there is no output file specified
     if not output_bed:
@@ -173,18 +175,38 @@ def genepanel(log_level, reference, input_json, output_bed, strand_match):
             "No enteries for input string was found in reference file.")
         raise click.Abort()
 
+    if 'exons' in input_json.keys():
+        if df.name.count() > 1 or df.name2.count() > 1 or df.strand.count() > 1:
+            LOG.error('More than one entry name (transcript) or name2 (gene) or strand column')
+            LOG.error(df.head())
+            raise click.Abort()
+
     # prepare filtered dataframe as bed file to write to output
     try:
         LOG.debug("Converting dataframe to pybedtools object and expanding exonStarts and exonEnds")
-        df_bed = pybedtools.BedTool.from_dataframe(df).expand(c="2,3").sort()
+        df_bed = pybedtools.BedTool.from_dataframe(df).expand(c="2,3").sort().to_dataframe()
+        df_out = copy.deepcopy(df_bed)
+        if exon_range:
+            exonNum = list(range(1, len(df_out)+1))
+
+            if df.strand.unique()[0] == "-":
+                exonNum.sort(reverse=True)
+
+            df_out['thickStart'] = exonNum
+            df_out = df_out[df_out['thickStart'].isin(exon_range)]
+            df_out['thickStart'] = 'exon_num_' + df_out['thickStart'].astype(str)
+        else:
+            df_out['thickStart'] = 'total_exon_' + df_out['thickStart'].astype(str)
+        
+        df_bed = pybedtools.BedTool.from_dataframe(df_out).sort()
     except:
-        LOG.error("Bed objet creation failed")
+        LOG.error("Bed object creation failed")
         raise click.Abort()
 
-    # collapse columns 4(strand), 5 (gene i.e. name2), and 6 (transcript i.e. name)
+    # collapse columns 
     try:
         LOG.debug("Merging bed regions and collapsing disctint strand, genename, transcript")
-        df_bed.merge(c='4,5,6', o="distinct").saveas(output_bed)
+        df_bed.merge(c='4,5,6,7', o="distinct").saveas(output_bed)
     except:
         LOG.error("Merge and collapse of BED object failed")
         raise click.Abort()
