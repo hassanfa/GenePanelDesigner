@@ -24,6 +24,7 @@ LOG = logging.getLogger(__name__)
 
 __version__ = 0.01
 
+
 def parseIntSet(nputstr=""):
     '''
     Expand range of numbers.
@@ -37,7 +38,7 @@ def parseIntSet(nputstr=""):
     for i in tokens:
         if len(i) > 0:
             if i[:1] == "<":
-                i = "1-%s"%(i[1:])
+                i = "1-%s" % (i[1:])
         try:
             # typically tokens are plain old integers
             selection.add(int(i))
@@ -50,8 +51,8 @@ def parseIntSet(nputstr=""):
                     # we have items seperated by a dash
                     # try to build a valid range
                     first = token[0]
-                    last = token[len(token)-1]
-                    for x in range(first, last+1):
+                    last = token[len(token) - 1]
+                    for x in range(first, last + 1):
                         selection.add(x)
             except:
                 # not an int and not a range...
@@ -62,6 +63,8 @@ def parseIntSet(nputstr=""):
         return None
     else:
         return selection
+
+
 # end parseIntSet
 
 
@@ -86,7 +89,10 @@ def parseIntSet(nputstr=""):
               Input string json with the following keys:
               genename, transcript, exon_number, coordinate.
               ''')
-@click.option('-o', '--output-bed', help='Output file name. If nothing is specified, it will be genename.bed')
+@click.option(
+    '-o',
+    '--output-bed',
+    help='Output file name. If nothing is specified, it will be genename.bed')
 @click.option(
     '--strand-match/--no-strand-match',
     default=False,
@@ -134,9 +140,9 @@ def genepanel(log_level, reference, input_json, output_bed, strand_match):
     if not output_bed:
         output_bed = '_'.join(str(x) for x in input_json.values())
         for ch in ",:-":
-            output_bed = output_bed.replace(ch,'_')
+            output_bed = output_bed.replace(ch, '_')
         output_bed += ".bed"
-        LOG.info("Setting output file name as %s",output_bed) 
+        LOG.info("Setting output file name as %s", output_bed)
     else:
         LOG.debug("Output file is %s", output_bed)
 
@@ -147,7 +153,7 @@ def genepanel(log_level, reference, input_json, output_bed, strand_match):
             reference, delimiter='\t', encoding='utf-8')
         # create a new df by removing all characters after "." in transcript field
         # i.e. "name" column
-        transcript_df = reference_df["name"].str.split(".", n = 1, expand = True)
+        transcript_df = reference_df["name"].str.split(".", n=1, expand=True)
         # replace transcript names with first value
         reference_df['name'] = transcript_df[0]
     except:
@@ -177,39 +183,49 @@ def genepanel(log_level, reference, input_json, output_bed, strand_match):
 
     if 'exons' in input_json.keys():
         if df.name.count() > 1 or df.name2.count() > 1 or df.strand.count() > 1:
-            LOG.error('More than one entry name (transcript) or name2 (gene) or strand column')
+            LOG.error(
+                'More than one entry name (transcript) or name2 (gene) or strand column'
+            )
             LOG.error(df.head())
             raise click.Abort()
 
     # prepare filtered dataframe as bed file to write to output
     try:
-        LOG.debug("Converting dataframe to pybedtools object and expanding exonStarts and exonEnds")
-        df_bed = pybedtools.BedTool.from_dataframe(df).expand(c="2,3").sort().to_dataframe()
+        LOG.debug(
+            "Converting dataframe to pybedtools object and expanding exonStarts and exonEnds"
+        )
+        df_bed = pybedtools.BedTool.from_dataframe(df).expand(
+            c="2,3").sort().to_dataframe()
         df_out = copy.deepcopy(df_bed)
         if exon_range:
-            exonNum = list(range(1, len(df_out)+1))
+            exonNum = list(range(1, len(df_out) + 1))
 
             if df.strand.unique()[0] == "-":
                 exonNum.sort(reverse=True)
 
             df_out['thickStart'] = exonNum
             df_out = df_out[df_out['thickStart'].isin(exon_range)]
-            df_out['thickStart'] = 'exon_num_' + df_out['thickStart'].astype(str)
+            df_out[
+                'thickStart'] = 'exon_num_' + df_out['thickStart'].astype(str)
         else:
-            df_out['thickStart'] = 'total_exon_' + df_out['thickStart'].astype(str)
-        
+            df_out['thickStart'] = 'total_exon_' + df_out['thickStart'].astype(
+                str)
+
         df_bed = pybedtools.BedTool.from_dataframe(df_out).sort()
     except:
         LOG.error("Bed object creation failed")
         raise click.Abort()
 
-    # collapse columns 
+    # collapse columns
     try:
-        LOG.debug("Merging bed regions and collapsing disctint strand, genename, transcript")
+        LOG.debug(
+            "Merging bed regions and collapsing disctint strand, genename, transcript"
+        )
         df_bed.merge(c='4,5,6,7', o="distinct").saveas(output_bed)
     except:
         LOG.error("Merge and collapse of BED object failed")
         raise click.Abort()
+
 
 if __name__ == '__main__':
     genepanel()
