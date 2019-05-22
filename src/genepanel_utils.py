@@ -1,4 +1,5 @@
 import json
+import os
 import copy
 import logging
 import pandas
@@ -87,7 +88,7 @@ def get_exon_range(input_json):
     return exon_range
 
 
-def build_output_file(output_bed, input_json):
+def build_output_file(output_bed, input_json, directory):
     '''
     Build output filename
     '''
@@ -101,6 +102,13 @@ def build_output_file(output_bed, input_json):
     else:
         LOG.debug("Output file is %s", output_bed)
 
+    if directory:
+        try:
+            os.makedirs(directory)
+        except FileExistsError:
+            pass
+        output_bed = os.path.join(directory, output_bed)
+
     return output_bed
 
 
@@ -112,15 +120,17 @@ def build_reference(reference):
     # read input reference file
     try:
         LOG.debug("Loading reference file into a dataframe")
+        header = ['#bin','name','chrom','strand','txStart','txEnd','cdsStart','cdsEnd','exonCount','exonStarts','exonEnds','score','name2','cdsStartStat','cdsEndStat','exonFrames']
         reference_df = pandas.read_csv(
-            reference, delimiter='\t', encoding='utf-8')
+            reference, delimiter='\t', encoding='utf-8', names=header)
         # create a new df by removing all characters after "." in transcript field
         # i.e. "name" column
         transcript_df = reference_df["name"].str.split(".", n=1, expand=True)
         # replace transcript names with first value
         reference_df['name'] = transcript_df[0]
     except:
-        LOG.error("Couldn't load reference file into dataframe")
+#        LOG.error("Couldn't load reference file into dataframe")
+        raise
         raise click.Abort()
 
     return reference_df
@@ -178,9 +188,13 @@ def filter_exon(df, exon_range):
     Filter bed file dataframe based on exon number and strand information
     '''
 
+    df = df[['chrom','exonStarts','exonEnds','name2','exonCount','strand','name']]
+    #df['exonCount'] = 'total_exon_' + df['exonCount'].astype(str)
+    df['name2'] = df[['name','name2']].apply(lambda x: '|'.join(x.values.astype(str)), axis=1)
     df_bed = pybedtools.BedTool.from_dataframe(df).expand(
         c="2,3").sort().to_dataframe()
     df_out = copy.deepcopy(df_bed)
+
     if exon_range:
         exonNum = list(range(1, len(df_out) + 1))
 
@@ -190,7 +204,11 @@ def filter_exon(df, exon_range):
         df_out['thickStart'] = exonNum
         df_out = df_out[df_out['thickStart'].isin(exon_range)]
         df_out['thickStart'] = 'exon_num_' + df_out['thickStart'].astype(str)
-    else:
-        df_out['thickStart'] = 'total_exon_' + df_out['thickStart'].astype(str)
+        df_out['name'] = df_out[['name', 'thickStart']].apply(lambda x: '|'.join(x.values.astype(str)), axis=1)
+    #else:
+    #    df_out['thickStart'] = 'total_exon_' + df_out['score'].astype(str)
+    
+    df_out['score'] = "1"
+    df_out = df_out[['chrom','start','end','name','score','strand']]
 
     return df_out
