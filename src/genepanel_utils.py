@@ -120,7 +120,11 @@ def build_reference(reference):
     # read input reference file
     try:
         LOG.debug("Loading reference file into a dataframe")
-        header = ['#bin','name','chrom','strand','txStart','txEnd','cdsStart','cdsEnd','exonCount','exonStarts','exonEnds','score','name2','cdsStartStat','cdsEndStat','exonFrames']
+        header = [
+            '#bin', 'name', 'chrom', 'strand', 'txStart', 'txEnd', 'cdsStart',
+            'cdsEnd', 'exonCount', 'exonStarts', 'exonEnds', 'score', 'name2',
+            'cdsStartStat', 'cdsEndStat', 'exonFrames'
+        ]
         reference_df = pandas.read_csv(
             reference, delimiter='\t', encoding='utf-8', names=header)
         # create a new df by removing all characters after "." in transcript field
@@ -129,7 +133,7 @@ def build_reference(reference):
         # replace transcript names with first value
         reference_df['name'] = transcript_df[0]
     except:
-#        LOG.error("Couldn't load reference file into dataframe")
+        #        LOG.error("Couldn't load reference file into dataframe")
         raise
         raise click.Abort()
 
@@ -188,9 +192,13 @@ def filter_exon(df, exon_range):
     Filter bed file dataframe based on exon number and strand information
     '''
 
-    df = df[['chrom','exonStarts','exonEnds','name2','exonCount','strand','name']]
+    df = df[[
+        'chrom', 'exonStarts', 'exonEnds', 'name2', 'exonCount', 'strand',
+        'name'
+    ]]
     #df['exonCount'] = 'total_exon_' + df['exonCount'].astype(str)
-    df['name2'] = df[['name','name2']].apply(lambda x: '|'.join(x.values.astype(str)), axis=1)
+    df['name2'] = df[['name', 'name2']].apply(
+        lambda x: '|'.join(x.values.astype(str)), axis=1)
     df_bed = pybedtools.BedTool.from_dataframe(df).expand(
         c="2,3").sort().to_dataframe()
     df_out = copy.deepcopy(df_bed)
@@ -204,11 +212,12 @@ def filter_exon(df, exon_range):
         df_out['thickStart'] = exonNum
         df_out = df_out[df_out['thickStart'].isin(exon_range)]
         df_out['thickStart'] = 'exon_num_' + df_out['thickStart'].astype(str)
-        df_out['name'] = df_out[['name', 'thickStart']].apply(lambda x: '|'.join(x.values.astype(str)), axis=1)
+        df_out['name'] = df_out[['name', 'thickStart']].apply(
+            lambda x: '|'.join(x.values.astype(str)), axis=1)
     #else:
     #    df_out['thickStart'] = 'total_exon_' + df_out['score'].astype(str)
-    
+
     df_out['score'] = "1"
-    df_out = df_out[['chrom','start','end','name','score','strand']]
+    df_out = df_out[['chrom', 'start', 'end', 'name', 'score', 'strand']]
 
     return df_out

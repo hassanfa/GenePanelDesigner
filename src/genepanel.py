@@ -65,14 +65,28 @@ __version__ = 0.01
               e.g. if strand is negative, the exon with largest coordinates
               is exon 1.
               ''')
-@click.option('-g','--gene',help="Genename/gene symbol, Accepted examples: TP53 (only one gene)")
-@click.option('-t','--transcript',help="Transcript. Accepted examples: NM_123545 (only one transcript)")
-@click.option('-e','--exon',help="Exon numbers. Accepted examples: '<3', '1-6', '1,4,10'")
-@click.option('-c','--coordinate',help="Coordinate. Accepted examples: '16:123456-123457,18:123456-123457'")
-@click.option('-d','--directory',help="Output directory/path for the bedfiles")
-@click.option('-p','--padding',help="Padding in bp.", default=30, show_default=True)
-def genepanel(log_level, reference, input_json, output_bed, strand_match, gene, transcript, exon, coordinate, directory,
-        padding):
+@click.option(
+    '-g',
+    '--gene',
+    help="Genename/gene symbol, Accepted examples: TP53 (only one gene)")
+@click.option(
+    '-t',
+    '--transcript',
+    help="Transcript. Accepted examples: NM_123545 (only one transcript)")
+@click.option(
+    '-e',
+    '--exon',
+    help="Exon numbers. Accepted examples: '<3', '1-6', '1,4,10'")
+@click.option(
+    '-c',
+    '--coordinate',
+    help="Coordinate. Accepted examples: '16:123456-123457,18:123456-123457'")
+@click.option(
+    '-d', '--directory', help="Output directory/path for the bedfiles")
+@click.option(
+    '-p', '--padding', help="Padding in bp.", default=30, show_default=True)
+def genepanel(log_level, reference, input_json, output_bed, strand_match, gene,
+              transcript, exon, coordinate, directory, padding):
     """
     Read input json string of genename, transcript, exon_number, and coordinate
     and write a 4 column bedfile.
@@ -84,7 +98,7 @@ def genepanel(log_level, reference, input_json, output_bed, strand_match, gene, 
     LOG.debug("Reference file is %s", reference)
     LOG.debug("Strandness search is set to %s", strand_match)
 
-    if (input_json in locals()) ^ (gene in locals()) :
+    if (input_json in locals()) ^ (gene in locals()):
         LOG.error("Only one or either of input_json or gene is required")
         raise click.Abort()
 
@@ -92,7 +106,7 @@ def genepanel(log_level, reference, input_json, output_bed, strand_match, gene, 
         input_json = read_json(input_json)
 
     if gene:
-        input_json=dict()
+        input_json = dict()
         input_json['genename'] = gene
 
     if transcript:
@@ -103,7 +117,6 @@ def genepanel(log_level, reference, input_json, output_bed, strand_match, gene, 
 
     if coordinate:
         input_json['coordinate'] = coordinate
-    
 
     for key in list(input_json.keys()):
         for ch in '" ':
@@ -145,6 +158,8 @@ def genepanel(log_level, reference, input_json, output_bed, strand_match, gene, 
             )
             df = filter_exon(df, exon_range)
             df_bed = pybedtools.BedTool.from_dataframe(df).sort()
+
+
 #        except:
 #            LOG.error("Bed object creation failed")
 #            raise click.Abort()
@@ -171,11 +186,11 @@ def genepanel(log_level, reference, input_json, output_bed, strand_match, gene, 
         df_bed['exonCount'] = "1"
         df_bed['name'] = "."
 
-        df_bed = df_bed[['chrom', 'exonStarts','exonEnds','name2','exonCount','strand']]
+        df_bed = df_bed[[
+            'chrom', 'exonStarts', 'exonEnds', 'name2', 'exonCount', 'strand'
+        ]]
         df_bed = pybedtools.BedTool.from_dataframe(df_bed).expand(
             c="2,3").sort()
-
-        
 
     # collapse columns
     try:
@@ -183,13 +198,14 @@ def genepanel(log_level, reference, input_json, output_bed, strand_match, gene, 
             "Merging bed regions and collapsing disctint strand, genename, transcript"
         )
 
-        df_bed.slop(b=padding, g='hg19.genome').merge(c='4,5,6', o="distinct").saveas(output_bed)
+        df_bed.slop(
+            b=padding, g='hg19.genome').merge(
+                c='4,5,6', o="distinct").saveas(output_bed)
     except:
         LOG.error("Merge and collapse of BED object failed")
         LOG.error(df_bed)
         LOG.error(output_bed)
         raise click.Abort()
-
 
 if __name__ == '__main__':
     genepanel()
